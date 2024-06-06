@@ -3,6 +3,13 @@ package DowJonesApp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cdimascio.dotenv.Dotenv;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,12 +17,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class App {
+public class App extends Application {
     private static Queue<StockData> stockQueue = new LinkedList<>();
     private static final Dotenv dotenv = Dotenv.configure().directory("./").load();
     private static final String API_KEY = dotenv.get("ALPHA_VANTAGE_API_KEY");
@@ -26,29 +32,62 @@ public class App {
             "https://www.alphavantage.co/query?function=%s&symbol=%s&outputsize=%s&apikey=%s",
             FUNCTION, SYMBOL, OUTPUTSIZE, API_KEY);
 
+    private LineChart<Number, Number> lineChart;
+    private XYChart.Series<Number, Number> series;
+    private int timeCounter = 0;  // Counter for the x-axis values
+
     public static void main(String[] args) {
-        try {
-            // Print all environment variables to verify
-            for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
-                System.out.println(entry.getKey() + " = " + entry.getValue());
-            }
+        launch(args);
+    }
 
-            // Print the API key to verify it's being read
-            System.out.println("API_KEY: " + API_KEY);
+    @Override
+    public void start(Stage stage) {
+        // Create the axes
+        NumberAxis xAxis = new NumberAxis();
+        NumberAxis yAxis = new NumberAxis();
+        xAxis.setLabel("Time");
+        yAxis.setLabel("Stock Price");
 
-            if (API_KEY == null || API_KEY.isEmpty()) {
-                System.err.println("API key is not set. Please set the ALPHA_VANTAGE_API_KEY environment variable.");
-                return;
-            }
+        // Create the line chart
+        lineChart = new LineChart<>(xAxis, yAxis);
+        lineChart.setTitle("Stock Monitoring, " + SYMBOL);
 
-            Timer timer = new Timer();
-            timer.schedule(new StockPriceFetcher(), 0, 86400000); // 86400000 ms = 24 hours
-        } catch (Exception e) {
-            e.printStackTrace();
+        // Create the series to hold data
+        series = new XYChart.Series<>();
+        series.setName("Daily Closing Prices");
+
+        // Add series to chart
+        lineChart.getData().add(series);
+
+        // Create the scene and set the stage
+        Scene scene = new Scene(lineChart, 800, 600);
+        stage.setScene(scene);
+        stage.setTitle("Stock Price Monitoring Application");
+        stage.show();
+
+        // Start the timer task to fetch stock data
+        if (API_KEY == null || API_KEY.isEmpty()) {
+            System.err.println("API key is not set. Please set the ALPHA_VANTAGE_API_KEY environment variable.");
+            return;
         }
+
+        Timer timer = new Timer();
+        timer.schedule(new StockPriceFetcher(this), 0, 86400000); // 86400000 ms = 24 hours
+    }
+
+    private void updateGraph(StockData stockData) {
+        Platform.runLater(() -> {
+            series.getData().add(new XYChart.Data<>(timeCounter++, stockData.getPrice()));
+        });
     }
 
     static class StockPriceFetcher extends TimerTask {
+        private final App app;
+
+        public StockPriceFetcher(App app) {
+            this.app = app;
+        }
+
         @Override
         public void run() {
             try {
@@ -78,7 +117,12 @@ public class App {
                 double price = latestData.path("4. close").asDouble();
                 long timestamp = System.currentTimeMillis();
 
-                stockQueue.add(new StockData(price, timestamp));
+                StockData stockData = new StockData(price, timestamp);
+                stockQueue.add(stockData);
+
+                // Update graph with new data
+                app.updateGraph(stockData);
+
                 System.out.println("Stock Price: " + price + " at " + timestamp);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
