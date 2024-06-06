@@ -4,7 +4,7 @@ This project, developed for the Citi Technology Software Development Job Simulat
 
 ## Overview
 
-The Stock Price Monitoring Application offers a visual representation of daily stock prices for the Walt Disney Company. Leveraging JavaFX, the application displays stock prices on a dynamic chart, updating in real-time with the latest data from the Alpha Vantage API.
+The Stock Price Monitoring Application offers a visual representation of daily stock prices for the Walt Disney Company. Leveraging JavaFX, the application displays stock prices on a dynamic chart, updating in real-time with the latest data from the [Alpha Vantage API](https://www.alphavantage.co).
 
 ## Features
 
